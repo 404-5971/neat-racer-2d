@@ -2,8 +2,33 @@ import math
 from typing import Literal
 
 import pygame
+from pygame.math import Vector2
 from pygame.rect import Rect
 from pygame.surface import Surface
+
+
+def get_line_intersection(
+    p1: Vector2, p2: Vector2, p3: Vector2, p4: Vector2
+) -> Vector2 | None:
+    """
+    Calculates intersection between line segment p1-p2 and p3-p4.
+    Returns the Vector2 point of intersection or None.
+    """
+    denominator: float = (p4.y - p3.y) * (p2.x - p1.x) - (p4.x - p3.x) * (p2.y - p1.y)
+    if denominator == 0:
+        return None  # Parallel lines
+
+    unit_a: float = (
+        (p4.x - p3.x) * (p1.y - p3.y) - (p4.y - p3.y) * (p1.x - p3.x)
+    ) / denominator
+    unit_b: float = (
+        (p2.x - p1.x) * (p1.y - p3.y) - (p2.y - p1.y) * (p1.x - p3.x)
+    ) / denominator
+
+    if 0 <= unit_a <= 1 and 0 <= unit_b <= 1:
+        # Return the actual intersection point
+        return Vector2(p1.x + unit_a * (p2.x - p1.x), p1.y + unit_a * (p2.y - p1.y))
+    return None
 
 
 class Car:
@@ -98,94 +123,74 @@ class Car:
         self.position = (self.position[0] + dx, self.position[1] - dy)
 
     def draw_raycasts(
-        self, screen: Surface, walls: list[tuple[tuple[int, int], tuple[int, int]]]
+        self,
+        screen: pygame.Surface,
+        walls: list[tuple[tuple[int, int], tuple[int, int]]],
     ) -> None:
-        # Draw 16 raycasts
-        number_of_rays: int = 16
+        center: Vector2 = Vector2(self.position) + Vector2(self.center)
         ray_length: int = 100
-        center: tuple[float, float] = (
-            self.position[0] + self.center[0],
-            self.position[1] + self.center[1],
-        )
-        for i in range(number_of_rays):
-            angle: float = math.radians(i * 22.5)
-            dx: float = ray_length * math.cos(angle)
-            dy: float = ray_length * math.sin(angle)
-            end_pos: tuple[float, float] = (center[0] + dx, center[1] + dy)
-            pygame.draw.line(screen, (255, 255, 255), center, end_pos, 1)
 
-            # Check for intersection with walls
-            closest_intersection: tuple[float, float] | None = None
-            min_dist: float = float("inf")
+        # Cast 16 rays
+        for i in range(16):
+            # Create a vector pointing right, then rotate it
+            ray_direction: Vector2 = Vector2(ray_length, 0).rotate(i * 22.5)
+            ray_end: Vector2 = center + ray_direction
 
-            for wall_start, wall_end in walls:
-                x1, y1 = wall_start
-                x2, y2 = wall_end
-                x3, y3 = center
-                x4, y4 = end_pos
+            # Default draw (white line)
+            pygame.draw.line(screen, (255, 255, 255), center, ray_end, 1)
 
-                denom: float = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1)
-                if denom == 0:
-                    continue
+            hit_point: Vector2 | None = None
+            min_dist_sq: float = float("inf")  # Use squared distance for performance
 
-                ua: float = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denom
-                ub: float = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom
+            for start, end in walls:
+                wall_start: Vector2 = Vector2(start)
+                wall_end: Vector2 = Vector2(end)
+                hit: Vector2 | None = get_line_intersection(
+                    wall_start, wall_end, center, ray_end
+                )
 
-                if 0 <= ua <= 1 and 0 <= ub <= 1:
-                    intersection_x: float = x1 + ua * (x2 - x1)
-                    intersection_y: float = y1 + ua * (y2 - y1)
-                    dist: float = math.hypot(
-                        intersection_x - center[0], intersection_y - center[1]
-                    )
-                    if dist < min_dist:
-                        min_dist = dist
-                        closest_intersection = (intersection_x, intersection_y)
+                if hit:
+                    # compare squared distances to avoid costly sqrt calls
+                    dist_sq: float = center.distance_squared_to(hit)
+                    if dist_sq < min_dist_sq:
+                        min_dist_sq = dist_sq
+                        hit_point = hit
 
-            if closest_intersection:
-                pygame.draw.circle(screen, (255, 0, 0), closest_intersection, 3)
+            if hit_point:
+                pygame.draw.circle(
+                    screen, (255, 0, 0), (int(hit_point.x), int(hit_point.y)), 3
+                )
 
     def check_death(self, walls: list[tuple[tuple[int, int], tuple[int, int]]]) -> bool:
-        # Calculate car corners
-        cx, cy = self.position[0] + self.center[0], self.position[1] + self.center[1]
-        w, h = self.size
-        hw, hh = w / 2, h / 2
+        center: Vector2 = Vector2(self.position) + Vector2(self.center)
+        width: int = self.size[0]
+        height: int = self.size[1]
 
-        # Corners relative to center
-        relative_corners: list[tuple[float, float]] = [
-            (-hw, -hh),
-            (hw, -hh),
-            (hw, hh),
-            (-hw, hh),
+        # Define unrotated corners relative to (0,0)
+        # Top-Left, Top-Right, Bottom-Right, Bottom-Left
+        corners_rel: list[Vector2] = [
+            Vector2(-width / 2, -height / 2),
+            Vector2(width / 2, -height / 2),
+            Vector2(width / 2, height / 2),
+            Vector2(-width / 2, height / 2),
         ]
 
-        rad: float = math.radians(self.rotation)
-        cos_a: float = math.cos(rad)
-        sin_a: float = math.sin(rad)
+        # Rotate all corners by car's rotation and shift to absolute position
+        # Note: Pygame rotation is typically negative degrees for clockwise
+        corners: list[Vector2] = [
+            c.rotate(-self.rotation) + center for c in corners_rel
+        ]
 
-        corners: list[tuple[float, float]] = []
-        for rx, ry in relative_corners:
-            # Screen space rotation
-            rot_x: float = rx * cos_a + ry * sin_a
-            rot_y: float = -rx * sin_a + ry * cos_a
-            corners.append((cx + rot_x, cy + rot_y))
+        for start, end in walls:
+            wall_start: Vector2 = Vector2(start)
+            wall_end: Vector2 = Vector2(end)
 
-        # Check intersection with walls
-        for wall_start, wall_end in walls:
-            x1, y1 = wall_start
-            x2, y2 = wall_end
-
+            # Check every edge of the car against every wall
             for i in range(4):
-                x3, y3 = corners[i]
-                x4, y4 = corners[(i + 1) % 4]
+                p1: Vector2 = corners[i]
+                p2: Vector2 = corners[(i + 1) % 4]  # Connects back to 0 at the end
 
-                denom: float = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1)
-                if denom == 0:
-                    continue
-
-                ua: float = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denom
-                ub: float = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom
-
-                if 0 <= ua <= 1 and 0 <= ub <= 1:
+                if get_line_intersection(wall_start, wall_end, p1, p2):
                     return True
 
         return False
