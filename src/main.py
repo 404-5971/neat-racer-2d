@@ -1,5 +1,6 @@
 import pygame
 from pygame import QUIT, Surface
+from pygame.key import ScancodeWrapper
 
 from car import Car
 from track import Track
@@ -21,7 +22,11 @@ def main() -> None:
             if event.type == QUIT:
                 running = False
 
-        keys = pygame.key.get_pressed()
+        screen.fill(BACKGROUND_COLOR)
+
+        track.draw(screen)
+
+        keys: ScancodeWrapper = pygame.key.get_pressed()
         if keys[pygame.K_LEFT]:
             car.steering_direction = "Left"
             car.steering_power = car.max_steering_power
@@ -40,16 +45,14 @@ def main() -> None:
             else:
                 car.braking_power = 0.0
 
+        track_walls: list[tuple[tuple[int, int], tuple[int, int]]] = track.get_walls()
+
         car.update()
 
-        screen.fill(BACKGROUND_COLOR)
-
-        track.draw(screen)
-
         car.draw(screen)
-        car.draw_raycasts(screen, track.get_walls())
+        car.draw_raycasts(screen, track_walls)
 
-        if car.check_death(track.get_walls()):
+        if car.check_death(track_walls):
             running = False
 
         pygame.display.flip()

@@ -2,6 +2,7 @@ import math
 from typing import Literal
 
 import pygame
+from pygame.rect import Rect
 from pygame.surface import Surface
 
 
@@ -42,7 +43,7 @@ class Car:
 
     def draw(self, screen: Surface) -> None:
         # Create a surface for the car
-        car_surface = Surface(self.size, pygame.SRCALPHA)
+        car_surface: Surface = Surface(self.size, pygame.SRCALPHA)
         car_surface.fill((255, 0, 0))
 
         # Draw a green dot on the front (right side)
@@ -54,11 +55,14 @@ class Car:
         pygame.draw.circle(car_surface, (255, 255, 255), self.center, 5)
 
         # Rotate the surface
-        rotated_surface = pygame.transform.rotate(car_surface, self.rotation)
+        rotated_surface: Surface = pygame.transform.rotate(car_surface, self.rotation)
 
         # Get the rect of the rotated surface and center it at the car's position
-        center = (self.position[0] + self.center[0], self.position[1] + self.center[1])
-        rotated_rect = rotated_surface.get_rect(center=center)
+        center: tuple[float, float] = (
+            self.position[0] + self.center[0],
+            self.position[1] + self.center[1],
+        )
+        rotated_rect: Rect = rotated_surface.get_rect(center=center)
 
         screen.blit(rotated_surface, rotated_rect)
 
@@ -88,9 +92,9 @@ class Car:
                 self.speed = 0
 
         # we need to travel the direction of our rotation
-        radians = math.radians(self.rotation)
-        dx = self.speed * math.cos(radians)
-        dy = self.speed * math.sin(radians)
+        radians: float = math.radians(self.rotation)
+        dx: float = self.speed * math.cos(radians)
+        dy: float = self.speed * math.sin(radians)
         self.position = (self.position[0] + dx, self.position[1] - dy)
 
     def draw_raycasts(
@@ -99,17 +103,20 @@ class Car:
         # Draw 16 raycasts
         number_of_rays: int = 16
         ray_length: int = 100
-        center = (self.position[0] + self.center[0], self.position[1] + self.center[1])
+        center: tuple[float, float] = (
+            self.position[0] + self.center[0],
+            self.position[1] + self.center[1],
+        )
         for i in range(number_of_rays):
-            angle = math.radians(i * 22.5)
-            dx = ray_length * math.cos(angle)
-            dy = ray_length * math.sin(angle)
-            end_pos = (center[0] + dx, center[1] + dy)
+            angle: float = math.radians(i * 22.5)
+            dx: float = ray_length * math.cos(angle)
+            dy: float = ray_length * math.sin(angle)
+            end_pos: tuple[float, float] = (center[0] + dx, center[1] + dy)
             pygame.draw.line(screen, (255, 255, 255), center, end_pos, 1)
 
             # Check for intersection with walls
-            closest_intersection = None
-            min_dist = float("inf")
+            closest_intersection: tuple[float, float] | None = None
+            min_dist: float = float("inf")
 
             for wall_start, wall_end in walls:
                 x1, y1 = wall_start
@@ -117,17 +124,17 @@ class Car:
                 x3, y3 = center
                 x4, y4 = end_pos
 
-                denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1)
+                denom: float = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1)
                 if denom == 0:
                     continue
 
-                ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denom
-                ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom
+                ua: float = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denom
+                ub: float = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom
 
                 if 0 <= ua <= 1 and 0 <= ub <= 1:
-                    intersection_x = x1 + ua * (x2 - x1)
-                    intersection_y = y1 + ua * (y2 - y1)
-                    dist = math.hypot(
+                    intersection_x: float = x1 + ua * (x2 - x1)
+                    intersection_y: float = y1 + ua * (y2 - y1)
+                    dist: float = math.hypot(
                         intersection_x - center[0], intersection_y - center[1]
                     )
                     if dist < min_dist:
@@ -144,17 +151,22 @@ class Car:
         hw, hh = w / 2, h / 2
 
         # Corners relative to center
-        relative_corners = [(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)]
+        relative_corners: list[tuple[float, float]] = [
+            (-hw, -hh),
+            (hw, -hh),
+            (hw, hh),
+            (-hw, hh),
+        ]
 
-        rad = math.radians(self.rotation)
-        cos_a = math.cos(rad)
-        sin_a = math.sin(rad)
+        rad: float = math.radians(self.rotation)
+        cos_a: float = math.cos(rad)
+        sin_a: float = math.sin(rad)
 
-        corners = []
+        corners: list[tuple[float, float]] = []
         for rx, ry in relative_corners:
             # Screen space rotation
-            rot_x = rx * cos_a + ry * sin_a
-            rot_y = -rx * sin_a + ry * cos_a
+            rot_x: float = rx * cos_a + ry * sin_a
+            rot_y: float = -rx * sin_a + ry * cos_a
             corners.append((cx + rot_x, cy + rot_y))
 
         # Check intersection with walls
@@ -166,12 +178,12 @@ class Car:
                 x3, y3 = corners[i]
                 x4, y4 = corners[(i + 1) % 4]
 
-                denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1)
+                denom: float = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1)
                 if denom == 0:
                     continue
 
-                ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denom
-                ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom
+                ua: float = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denom
+                ub: float = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom
 
                 if 0 <= ua <= 1 and 0 <= ub <= 1:
                     return True
