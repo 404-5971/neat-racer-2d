@@ -1,7 +1,5 @@
 import pygame
-from pygame import QUIT, Surface
-
-BACKGROUND_COLOR: tuple[int, int, int] = (50, 50, 50)
+from pygame.surface import Surface
 
 
 class Track:
@@ -263,31 +261,3 @@ class Track:
     def get_walls(self) -> list[tuple[tuple[int, int], tuple[int, int]]]:
         """Returns list of segments for the Car's raycasting logic"""
         return self.walls
-
-
-def main() -> None:
-    pygame.init()
-    screen: Surface = pygame.display.set_mode((1280, 720))
-    clock: pygame.time.Clock = pygame.time.Clock()
-    running: bool = True
-
-    track = Track()
-
-    while running:
-        for event in pygame.event.get():
-            if event.type == QUIT:
-                running = False
-
-        screen.fill(BACKGROUND_COLOR)
-
-        track.draw(screen)
-
-        pygame.display.flip()
-
-        clock.tick(60)
-
-    pygame.quit()
-
-
-if __name__ == "__main__":
-    main()
