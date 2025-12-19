@@ -122,22 +122,19 @@ class Car:
         dy: float = self.speed * math.sin(radians)
         self.position = (self.position[0] + dx, self.position[1] - dy)
 
-    def draw_raycasts(
+    def get_raycast_hits(
         self,
-        screen: pygame.Surface,
         walls: list[tuple[tuple[int, int], tuple[int, int]]],
-    ) -> None:
+    ) -> list[Vector2 | None]:
         center: Vector2 = Vector2(self.position) + Vector2(self.center)
         ray_length: int = 100
+        hit_list: list[Vector2 | None] = []
 
         # Cast 16 rays
         for i in range(16):
             # Create a vector pointing right, then rotate it
             ray_direction: Vector2 = Vector2(ray_length, 0).rotate(i * 22.5)
             ray_end: Vector2 = center + ray_direction
-
-            # Default draw (white line)
-            pygame.draw.line(screen, (255, 255, 255), center, ray_end, 1)
 
             hit_point: Vector2 | None = None
             min_dist_sq: float = float("inf")  # Use squared distance for performance
@@ -156,10 +153,56 @@ class Car:
                         min_dist_sq = dist_sq
                         hit_point = hit
 
-            if hit_point:
-                pygame.draw.circle(
-                    screen, (255, 0, 0), (int(hit_point.x), int(hit_point.y)), 3
+            hit_list.append(hit_point)
+
+        return hit_list
+
+    def draw_raycast_hits(
+        self,
+        screen: pygame.Surface,
+        walls: list[tuple[tuple[int, int], tuple[int, int]]],
+    ) -> None:
+        for hit in self.get_raycast_hits(walls):
+            if hit:
+                pygame.draw.circle(screen, (255, 0, 0), (int(hit.x), int(hit.y)), 3)
+
+    def draw_raycast_lines(
+        self,
+        screen: pygame.Surface,
+        walls: list[tuple[tuple[int, int], tuple[int, int]]],
+    ) -> None:
+        center: Vector2 = Vector2(self.position) + Vector2(self.center)
+        ray_length: int = 100
+        hit_list: list[Vector2 | None] = []
+
+        # Cast 16 rays
+        for i in range(16):
+            # Create a vector pointing right, then rotate it
+            ray_direction: Vector2 = Vector2(ray_length, 0).rotate(i * 22.5)
+            ray_end: Vector2 = center + ray_direction
+
+            hit_point: Vector2 | None = None
+            min_dist_sq: float = float("inf")  # Use squared distance for performance
+
+            for start, end in walls:
+                wall_start: Vector2 = Vector2(start)
+                wall_end: Vector2 = Vector2(end)
+                hit: Vector2 | None = get_line_intersection(
+                    wall_start, wall_end, center, ray_end
                 )
+
+                if hit:
+                    # compare squared distances to avoid costly sqrt calls
+                    dist_sq: float = center.distance_squared_to(hit)
+                    if dist_sq < min_dist_sq:
+                        min_dist_sq = dist_sq
+                        hit_point = hit
+
+            hit_list.append(hit_point)
+
+        for hit in hit_list:
+            if hit:
+                pygame.draw.line(screen, (255, 255, 255), center, hit, 1)
 
     def check_death(self, walls: list[tuple[tuple[int, int], tuple[int, int]]]) -> bool:
         center: Vector2 = Vector2(self.position) + Vector2(self.center)

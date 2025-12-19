@@ -50,7 +50,10 @@ def main() -> None:
         car.update()
 
         car.draw(screen)
-        car.draw_raycasts(screen, track_walls)
+
+        # Drawing these is completely optional
+        car.draw_raycast_lines(screen, track_walls)
+        car.draw_raycast_hits(screen, track_walls)
 
         if car.check_death(track_walls):
             running = False
